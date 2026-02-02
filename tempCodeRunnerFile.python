@@ -1,6 +1,18 @@
 s = input()
+left = 0
+right = len(s) - 1
 
-if s == s[::-1]:
-    print("palindrome")
+is_palindrome = True
+
+while left < right:
+    if s[left] != s[right]:
+        is_palindrome = False
+        break
+    left += 1
+    right -=1 
+
+if is_palindrome == True:
+    print('palindrome')
 else:
     print("not a palindrome")
+    
