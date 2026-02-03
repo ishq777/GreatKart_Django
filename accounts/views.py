@@ -7,11 +7,11 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import EmailMessage
 from django.http import HttpResponse
-
-#verification mail
+from carts.models import Cart, CartItem
 from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
 from django.contrib.auth.tokens import default_token_generator
+import requests
 
 
 # this is based on the models we r taking cleaned data
@@ -61,19 +61,59 @@ def register(request):
 
 
 def login(request):
+    from carts.views import _cart_id
     if request.method == 'POST':
             email = request.POST['email']
             password = request.POST['password']
 
             user = auth.authenticate(username=email,password=password)
-
+            
             if user is not None:
-                 auth.login(request,user)
-                #  messages.success(request, 'u r logged in')
-                 return redirect('home')
-            else:
-                 messages.error(request, 'invalid credentials')
-                 return redirect('login')
+                   try:
+                        cart = Cart.objects.get(cart_id=_cart_id(request))  
+                        is_cart_item_exists = CartItem.objects.filter(cart=cart).exists()
+                        if is_cart_item_exists:
+                             cart_items = CartItem.objects.filter(cart=cart)
+                             for cart_item in cart_items:
+                                   session_variations = list(cart_item.variations.all())
+
+                                   user_items = CartItem.objects.filter(
+                                        products=cart_item.products,
+                                        user=user
+                                   )
+
+                                   matched = False
+
+                                   for user_item in user_items:
+                                        if list(user_item.variations.all()) == session_variations:
+                                             user_item.quantity += cart_item.quantity
+                                             user_item.save()
+                                             matched = True
+                                             break
+
+                                   if not matched:
+                                        cart_item.user = user
+                                        cart_item.cart = None
+                                        cart_item.save()
+                                   else:
+                                        cart_item.delete()
+          
+                   except:
+                        pass
+                        
+                   auth.login(request,user)
+               #     messages.success(request, 'u r logged in')
+                   url = request.META.get('HTTP_REFERER') #this is not working?
+                   try:
+                         query =requests.utils.urlparse(url).query
+                         print('query ->', query)
+                         return redirect('checkout')
+                   except:
+                        pass
+                        
+            else:  
+              messages.error(request, 'invalid credentials')
+              return redirect('login')
             
     return render(request, 'accounts/login.html')
     
