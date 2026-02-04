@@ -1,4 +1,4 @@
 git status
 git add .
-git commit -m "mssg"
+git commit -m "checkout+review_order"
 git push

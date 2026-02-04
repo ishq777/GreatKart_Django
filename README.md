@@ -1,0 +1,1 @@
+GreatKart is a Django-based e-commerce project that demonstrates shopping cart functionality, product variations, and user authentication. It supports both guest and logged-in users, merges carts on login, and ensures users are redirected back to their intended page after authentication.
