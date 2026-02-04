@@ -101,16 +101,9 @@ def login(request):
                    except:
                         pass
                         
-                   auth.login(request,user)
-               #     messages.success(request, 'u r logged in')
-                   url = request.META.get('HTTP_REFERER') #this is not working?
-                   try:
-                         query =requests.utils.urlparse(url).query
-                         print('query ->', query)
-                         return redirect('checkout')
-                   except:
-                        pass
-                        
+                   auth.login(request,user) 
+                   return redirect('home')
+
             else:  
               messages.error(request, 'invalid credentials')
               return redirect('login')

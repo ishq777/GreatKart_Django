@@ -1,0 +1,16 @@
+{% autoescape off %}
+
+
+Hi {{user.full_name}},
+
+Thank You for the purchase.
+Please find the details below:
+Order Number: {{order.order_number}}
+Order Amount: {{order.order_total}}
+Payment Method : <b>UPI</b>
+
+
+If this isn't you, please ignore this  email.
+
+
+{% endautoescape %}
