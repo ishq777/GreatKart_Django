@@ -39,7 +39,7 @@ class MyAccountManager(BaseUserManager):
         return user
 
 
-
+#this defines how user is created ensures
 class Account(AbstractBaseUser):
     
     first_name = models.CharField(max_length=50)
@@ -70,13 +70,35 @@ class Account(AbstractBaseUser):
     def full_name(self):
         return f'{self.first_name} {self.last_name}'
     
-    
 
     def has_perm(self,perm,obj=None):
         return self.is_admin
     
     def has_module_perms(self, add_label):
         return True
+
+
+
+class UserProfile(models.Model):
+
+    user = models.OneToOneField(Account, on_delete=models.CASCADE)
+    address_line_1 = models.CharField(blank=True, max_length=50)
+    address_line_2 = models.CharField(blank=True, max_length=50)
+    profile_picture = models.ImageField(blank=True, upload_to='userprofile/')
+    city = models.CharField(max_length=20, blank=True)
+    state = models.CharField(max_length=20, blank=True)
+    country = models.CharField(max_length=20, blank=True)
+
+    def __str__(self):
+        return self.user.first_name
+    
+
+    
+    def full_address(self):
+        return f'{self.address_line_1} {self.address_line_2}'
+
+
+
 
 
 
