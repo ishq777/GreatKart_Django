@@ -1,3 +1,5 @@
+#corrected code working well 
+
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from carts.models import Cart, CartItem
@@ -11,43 +13,77 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 from accounts.models import Account
+from django.views.decorators.cache import never_cache
 # Create your views here.
 
 
-
+@never_cache
 @login_required(login_url='login')
-def payments(request):
-    if request.method != 'POST':
-        return redirect('store')
+def payments(request, order_number):
+    
+    #here we will get only the current user
+    if request.method == 'GET':
+        order = Order.objects.filter(
+            user=request.user,
+            is_ordered=False,
+            order_number=order_number
+        ).first()
 
+        #this is the main check after order, go to dashboard
+        if not order or order.is_ordered:
+            return redirect('my_orders')
+
+        cart_items = CartItem.objects.filter(user=request.user)
+
+        total = sum(item.products.price * item.quantity for item in cart_items)
+        tax = (2 * total) / 100
+        grand_total = total + tax
+
+        #pass the context in the payemnts
+
+        return render(request, 'orders/payments.html', {
+            'order': order,
+            'cart_items': cart_items,
+            'total': total,
+            'tax': tax,
+            'grand_total': grand_total,
+        })
+
+    # ---------- POST : static payment success ----------
     order_number = request.POST.get('order_number')
     if not order_number:
         return redirect('store')
-    order = Order.objects.filter(user=request.user, is_ordered=False, order_number=order_number).first()
+
+    order = Order.objects.filter(
+        user=request.user,
+        is_ordered=False,
+        order_number=order_number
+    ).first()
+
+    if not order:
+        return redirect('store')
+
     payment_id = f"SIM-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
     payment = Payment(
-
-        user = request.user,
-        payment_id = payment_id,
-        payment_method = 'Simulated',
-        amount_paid = order.order_total,
-        status = 'COMPLETED',
+        user=request.user,
+        payment_id=payment_id,
+        payment_method='Simulated',
+        amount_paid=order.order_total,
+        status='COMPLETED',
     )
-
     payment.save()
 
     order.payment = payment
     order.is_ordered = True
     order.save()
 
-    #move cart items to order product table
-
+    # ---------- move cart items to order product ----------
     cart_items = CartItem.objects.filter(user=request.user)
-    cart_items_list = list(cart_items)
 
-    for item in cart_items_list:
+    for item in cart_items:
         orderproduct = OrderProduct()
-        orderproduct.order_id = order.id 
+        orderproduct.order_id = order.id
         orderproduct.payment = payment
         orderproduct.user_id = request.user.id
         orderproduct.product_id = item.products_id
@@ -56,41 +92,29 @@ def payments(request):
         orderproduct.ordered = True
         orderproduct.save()
 
-        product_variation = item.variations.all()
-        orderproduct = OrderProduct.objects.get(id=orderproduct.id)
-        orderproduct.variation.set(product_variation)
-        orderproduct.save()
-
-        #reduce item quantity in the cart
+        orderproduct.variation.set(item.variations.all())
 
         product = Product.objects.get(id=item.products_id)
         product.stock = max(0, product.stock - item.quantity)
         product.save()
 
-
-    #CLEAR CART
+    # ---------- clear cart ----------
     CartItem.objects.filter(user=request.user).delete()
 
-
-    #send mail to confirm
-
-    # user = request.user
+    # ---------- send confirmation email ----------
     mail_subject = 'Thank You for your purchase'
-    message = render_to_string('orders/order_received_email.html',{
-            
+    message = render_to_string(
+        'orders/order_received_email.html',
+        {
             'user': request.user,
-            'order':order,
-            })
+            'order': order,
+        }
+    )
 
-
-    to_email = request.user.email
-    send_email = EmailMessage(mail_subject,message,to=[to_email])
-    send_email.send()
-
-
-
+    EmailMessage(mail_subject, message, to=[request.user.email]).send()
 
     return redirect('order_complete')
+
 
 
 
@@ -116,6 +140,30 @@ def place_order(request, total = 0, quantity=0):
         quantity += cart_item.quantity
     tax = (2 * total) / 100
     grand_total = total + tax
+
+     # if request.method=='GET':
+    #     print("here")
+    #     ord = Order.objects.filter(user=request.user, is_ordered=True).order_by('-created_at').first()
+    #     print(ord,ord.payment)
+    #     if ord is not None and ord.payment is None:
+    #         print( ord.payment)
+    #         # print()
+    #         return redirect('home')
+    
+    # if request.method == 'POST':
+    #     ord = Order.objects.filter(user=request.user, is_ordered=True).order_by('-created_at').first()
+    #     print(ord,ord.payment)
+    #     if ord is not None and ord.payment is None:
+    #         print( ord.payment)
+    #         # print()
+    #         return redirect('home')
+    #     current_user = request.user
+
+    #     cart_items = CartItem.objects.filter(user=current_user)
+    #     cart_count = cart_items.count()
+
+    #     if cart_count <= 0:
+    #         return redirect('store')
 
     
     if request.method == 'POST':
@@ -146,23 +194,24 @@ def place_order(request, total = 0, quantity=0):
             data.order_number = order_number
             data.save()
 
-            order = Order.objects.get(user=current_user, is_ordered=False, order_number=order_number)
-            context = {
+            # order = Order.objects.get(user=current_user, is_ordered=False, order_number=order_number)
+            # context = {
 
-                'order':order,
-                'cart_items':cart_items,
-                'total': total,
-                'tax':tax,
-                'grand_total':grand_total,
-            }
-            return render(request, 'orders/payments.html', context)
+            #     'order':order,
+            #     'cart_items':cart_items,
+            #     'total': total,
+            #     'tax':tax,
+            #     'grand_total':grand_total,
+            # }
+            return redirect('payments', order_number=order_number)
+
         else:
             print(form.errors)
             return redirect('checkout')
         
 
 
-
+@never_cache
 @login_required(login_url='login')
 def order_complete(request):
     order = Order.objects.filter(user=request.user, is_ordered=True).order_by('-created_at').first()
@@ -187,7 +236,6 @@ def order_complete(request):
 
 
         
-
 
 
 
